@@ -27,12 +27,23 @@ Aplicația va apărea în system tray (lângă ceas) și se va adăuga automat l
 
 ## Utilizare
 
-- **Iconița** afișează `CW` și numărul săptămânii (ex: `CW 16`)
+- **Iconița** afișează numărul săptămânii (ex: `16`)
 - **Hover** pe iconiță → afișează săptămâna, anul și intervalul de date
 - **Click dreapta** → meniu cu opțiuni:
-  - Info săptămână
+  - Info săptămână (neclicabil)
+  - **Standard săptămână** (submeniu, alege cum se calculează CW-ul)
   - Activare/dezactivare pornire automată cu Windows
   - Exit
+
+### Standarde de săptămână
+
+| Standard | Ziua de început | Săptămâna 1 | Uz |
+|---|---|---|---|
+| **ISO 8601** (default) | Luni | Săptămâna care conține prima zi de joi a anului (echiv. cu cea care are 4+ zile în anul nou) | Europa, ISO, majoritatea industriilor. |
+| **US** | Duminică | Săptămâna care conține 1 ianuarie | Statele Unite, Canada. |
+| **Simplu** | Luni | Săptămâna care conține 1 ianuarie | Variantă pragmatică — start de luni, fără regula ISO de "prima joi". |
+
+Alegerea se salvează în `%APPDATA%\CWTray\config.json` și persistă între restartări.
 
 ---
 
