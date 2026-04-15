@@ -17,44 +17,57 @@ def get_cw():
 
 
 def make_icon(cw_number):
-    """Generate a 64x64 tray icon with 'CW XX' text on black background."""
+    """Generate a tray icon with 'CWxx' as a single line, as large as possible."""
     size = 64
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 255))
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    text_top = f"CW"
-    text_bot = str(cw_number)
+    text = f"CW{cw_number}"
 
-    # Try to use a system font, fall back to default
-    font_top = None
-    font_bot = None
     font_paths = [
         "C:/Windows/Fonts/arialbd.ttf",
         "C:/Windows/Fonts/arial.ttf",
         "C:/Windows/Fonts/verdana.ttf",
     ]
+
+    def load_font(fp, sz):
+        return ImageFont.truetype(fp, sz)
+
+    chosen_path = None
     for fp in font_paths:
         if os.path.exists(fp):
+            chosen_path = fp
+            break
+
+    font = None
+    if chosen_path:
+        # Binary-search the largest font size that fits within the icon.
+        lo, hi = 8, size
+        best = 8
+        while lo <= hi:
+            mid = (lo + hi) // 2
             try:
-                font_top = ImageFont.truetype(fp, 22)
-                font_bot = ImageFont.truetype(fp, 28)
-                break
+                f = load_font(chosen_path, mid)
             except Exception:
-                pass
+                break
+            bbox = draw.textbbox((0, 0), text, font=f)
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+            if w <= size and h <= size:
+                best = mid
+                lo = mid + 1
+            else:
+                hi = mid - 1
+        font = load_font(chosen_path, best)
+    else:
+        font = ImageFont.load_default()
 
-    if font_top is None:
-        font_top = ImageFont.load_default()
-        font_bot = font_top
-
-    # Draw "CW" on top half
-    bbox_top = draw.textbbox((0, 0), text_top, font=font_top)
-    w_top = bbox_top[2] - bbox_top[0]
-    draw.text(((size - w_top) / 2, 4), text_top, font=font_top, fill=(255, 255, 255, 255))
-
-    # Draw number on bottom half
-    bbox_bot = draw.textbbox((0, 0), text_bot, font=font_bot)
-    w_bot = bbox_bot[2] - bbox_bot[0]
-    draw.text(((size - w_bot) / 2, 30), text_bot, font=font_bot, fill=(255, 255, 0, 255))
+    bbox = draw.textbbox((0, 0), text, font=font)
+    w = bbox[2] - bbox[0]
+    h = bbox[3] - bbox[1]
+    x = (size - w) / 2 - bbox[0]
+    y = (size - h) / 2 - bbox[1]
+    draw.text((x, y), text, font=font, fill=(255, 255, 255, 255))
 
     return img
 
@@ -83,9 +96,11 @@ def is_autostart_enabled():
 
 
 def enable_autostart():
-    exe = sys.executable
-    script = os.path.abspath(__file__)
-    value = f'"{exe}" "{script}"'
+    if getattr(sys, "frozen", False):
+        # Running as a PyInstaller-built .exe
+        value = f'"{sys.executable}"'
+    else:
+        value = f'"{sys.executable}" "{os.path.abspath(__file__)}"'
     key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTOSTART_KEY, 0, winreg.KEY_SET_VALUE)
     winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, value)
     winreg.CloseKey(key)
