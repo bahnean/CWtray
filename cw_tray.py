@@ -68,13 +68,35 @@ def compute_cw(today, standard):
     return compute_cw(today, "iso")
 
 
+def is_taskbar_light():
+    """Return True if Windows is using a light system theme (light taskbar)."""
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+            0,
+            winreg.KEY_READ,
+        )
+        val, _ = winreg.QueryValueEx(key, "SystemUsesLightTheme")
+        winreg.CloseKey(key)
+        return bool(val)
+    except (FileNotFoundError, OSError):
+        return False  # default to dark taskbar (common on Windows)
+
+
 def make_icon(cw_number):
-    """Generate a tray icon with the week number, as large as possible."""
+    """Generate a tray icon with the week number, as large as possible.
+
+    Text color auto-adapts to the current taskbar theme:
+    - Light taskbar -> black text
+    - Dark taskbar  -> white text
+    """
     size = 256
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
     text = str(cw_number)
+    fg = (0, 0, 0, 255) if is_taskbar_light() else (255, 255, 255, 255)
 
     font_paths = [
         "C:/Windows/Fonts/arialbd.ttf",
@@ -117,7 +139,7 @@ def make_icon(cw_number):
     h = bbox[3] - bbox[1]
     x = (size - w) / 2 - bbox[0]
     y = (size - h) / 2 - bbox[1]
-    draw.text((x, y), text, font=font, fill=(0, 0, 0, 255))
+    draw.text((x, y), text, font=font, fill=fg)
 
     return img
 
@@ -167,6 +189,7 @@ class CWTrayApp:
         if self.standard not in {k for k, _, _ in STANDARDS}:
             self.standard = DEFAULT_STANDARD
         self.cw = self._current_week()
+        self.theme_light = is_taskbar_light()
         self.icon = None
         self._stop_event = threading.Event()
 
@@ -224,15 +247,17 @@ class CWTrayApp:
         self.icon.stop()
 
     def update_loop(self):
-        """Check every minute if week changed and update icon."""
+        """Check periodically if week or taskbar theme changed; update icon."""
         while not self._stop_event.is_set():
             new_cw = self._current_week()
-            if new_cw != self.cw:
+            new_theme = is_taskbar_light()
+            if new_cw != self.cw or new_theme != self.theme_light:
                 self.cw = new_cw
+                self.theme_light = new_theme
                 self.icon.icon = make_icon(self.cw)
                 self.icon.title = get_tooltip(self.standard)
                 self.icon.menu = self.build_menu()
-            time.sleep(60)
+            time.sleep(10)
 
     def run(self):
         if not is_autostart_enabled():
