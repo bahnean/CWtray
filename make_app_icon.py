@@ -1,42 +1,36 @@
-"""Generate calendar.ico — a generic calendar icon for the .exe."""
+"""Generate calendar.ico — a clean, flat calendar icon for the .exe.
+
+Design priorities: readable at 16-32 px, no fine detail that disappears
+when downscaled. Flat rounded square, solid top band, bold day number.
+"""
 from PIL import Image, ImageDraw, ImageFont
 import os
+
+
+RED = (225, 75, 70, 255)
+WHITE = (255, 255, 255, 255)
+DARK = (35, 35, 40, 255)
 
 
 def make_calendar(size):
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    pad = max(1, int(size * 0.06))
-    r = max(2, int(size * 0.14))  # corner radius
-    header_h = int(size * 0.22)
+    # Geometry scales with size. Keep numbers "round" so small renders stay crisp.
+    radius = max(2, size // 7)
+    band_h = max(3, int(size * 0.30))
 
-    body_rect = (pad, pad, size - pad, size - pad)
-    header_rect = (pad, pad, size - pad, pad + header_h)
+    body = (0, 0, size - 1, size - 1)
+    band = (0, 0, size - 1, band_h)
 
-    # Body (white)
-    draw.rounded_rectangle(body_rect, radius=r, fill=(255, 255, 255, 255))
-    # Header (red)
-    # Draw a rounded rect and mask the bottom by overdrawing a flat strip.
-    draw.rounded_rectangle(header_rect, radius=r, fill=(220, 50, 50, 255))
-    draw.rectangle(
-        (pad, pad + header_h - r, size - pad, pad + header_h),
-        fill=(220, 50, 50, 255),
-    )
+    # White body with rounded corners.
+    draw.rounded_rectangle(body, radius=radius, fill=WHITE, outline=DARK, width=max(1, size // 32))
 
-    # Two rings on the header
-    ring_r = max(1, int(size * 0.035))
-    ring_y = pad + int(header_h * 0.15)
-    ring_y2 = pad - int(size * 0.04)
-    for cx in (pad + int(size * 0.28), size - pad - int(size * 0.28)):
-        draw.ellipse(
-            (cx - ring_r, ring_y2, cx + ring_r, ring_y2 + ring_r * 2 + int(size * 0.06)),
-            fill=(200, 200, 200, 255),
-            outline=(120, 120, 120, 255),
-            width=max(1, int(size * 0.012)),
-        )
+    # Red top band. Rounded only at the top; flat bottom by overdrawing.
+    draw.rounded_rectangle(band, radius=radius, fill=RED)
+    draw.rectangle((0, band_h - radius, size - 1, band_h), fill=RED)
 
-    # Day number "31"
+    # Day number in the body.
     text = "31"
     font_path = None
     for fp in ("C:/Windows/Fonts/arialbd.ttf", "C:/Windows/Fonts/arial.ttf"):
@@ -44,11 +38,10 @@ def make_calendar(size):
             font_path = fp
             break
 
-    # Fit text in the body area below the header
-    body_top = pad + header_h
-    body_bot = size - pad
-    avail_h = body_bot - body_top - int(size * 0.06)
-    avail_w = (size - 2 * pad) - int(size * 0.1)
+    body_top = band_h
+    body_bot = size - 1
+    avail_h = int((body_bot - body_top) * 0.85)
+    avail_w = int(size * 0.80)
 
     if font_path:
         lo, hi = 4, size
@@ -74,15 +67,15 @@ def make_calendar(size):
     bbox = draw.textbbox((0, 0), text, font=font)
     w = bbox[2] - bbox[0]
     h = bbox[3] - bbox[1]
-    cx = (size - w) / 2 - bbox[0]
-    cy = body_top + (avail_h - h) / 2 - bbox[1] + int(size * 0.03)
-    draw.text((cx, cy), text, font=font, fill=(40, 40, 40, 255))
+    x = (size - w) / 2 - bbox[0]
+    y = body_top + ((body_bot - body_top) - h) / 2 - bbox[1]
+    draw.text((x, y), text, font=font, fill=DARK)
 
     return img
 
 
 if __name__ == "__main__":
-    sizes = [16, 24, 32, 48, 64, 128, 256]
+    sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
     images = [make_calendar(s) for s in sizes]
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "calendar.ico")
     images[0].save(out, format="ICO", sizes=[(s, s) for s in sizes], append_images=images[1:])
